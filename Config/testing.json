@@ -1,0 +1,18 @@
+{
+    "app": {
+        "name": "拼图游戏",
+        "apiPrefix": "api"
+    },
+    "database": {
+        "hostname":"localhost",
+        "port":5432,
+        "username":"mrqi",
+        "password":"mrqi",
+        "database":"mrqi",
+        "url": "postgres://mrqi:mrqi@localhost:5432/mrqi",
+        "maxConnections": 10
+    },
+    "auth": {
+        "jwtSecret": "dev_secret_key"
+    }
+}
