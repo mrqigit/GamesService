@@ -70,9 +70,23 @@ struct UpdateUserRequest: Content {
 }
 
 // 登录请求DTO
-struct LoginRequest: Content {
+struct LoginRequest: Content, Validatable {
     let username: String
     let password: String
+    
+    // 实现验证逻辑
+    static func validations(_ validations: inout Validations) {
+        // 用户名：非空，长度 3-20 字符
+        validations.add("username", as: String.self, is: !.empty && .count(3...20), customFailureDescription: "用户名不规范")
+        // 密码：非空，长度至少 6 字符（建议实际项目中要求更复杂，如包含大小写、数字等）
+        validations.add("password", as: String.self, is: !.empty && .count(6...), customFailureDescription: "密码不规范")
+    }
+}
+
+extension LoginRequest {
+    var description: String {
+        return "LoginRequest(username: \(username), password: [REDACTED])"
+    }
 }
 
 // 登录响应DTO

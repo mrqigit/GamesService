@@ -254,29 +254,33 @@ struct UserController {
     
     func login(req: Request) async throws -> LoginResponse {
         let credentials = try req.content.decode(LoginRequest.self)
-            
+        try credentials.validate(on: req)
+        
+        // 查询用户并预加载角色
         guard let user = try await User.query(on: req.db)
+            .with(\.$role) // 关键：预加载角色关系
             .filter(\.$username == credentials.username)
-            .first(),
-              try Bcrypt
-            .verify(credentials.password, created: user.passwordHash) else {
-            throw Abort(.unauthorized)
+            .first() else {
+            throw Abort(.unauthorized, reason: "用户名或密码错误")
         }
-            
-        // 显式指定签名算法
+        
+        // 验证密码
+        guard try Bcrypt.verify(credentials.password, created: user.passwordHash) else {
+            throw Abort(.unauthorized, reason: "用户名或密码错误")
+        }
+        
+        // 创建 JWT
         let payload = try UserPayload(user: user)
         let token = try req.jwt.sign(payload)
         
-        // ✅ 安全解包角色值
-        guard let role = user.$role.value else {
-            throw Abort(.internalServerError, reason: "用户角色关联丢失")
-        }
-            
+        // 此时角色已预加载，可安全访问
+        let role = user.$role.value!
+        
         return LoginResponse(
             token: token,
             user: UserResponse(
                 from: user,
-                role: RoleResponse(from: role),  // 使用解包后的角色
+                role: RoleResponse(from: role),
                 auth: user.realNameAuth.map { RealNameAuthResponse(from: $0) }
             )
         )

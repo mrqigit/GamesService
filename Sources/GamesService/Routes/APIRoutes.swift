@@ -13,7 +13,7 @@ struct APIRoutes {
     func registerRoutes(prefix: String) throws {
         let api = app.routes
             .grouped(PathComponent(stringLiteral: prefix))
-//            .grouped(ErrorHandlingMiddleware())
+            .grouped(ErrorHandlingMiddleware())
 //            .grouped(JWTUserAuthenticationMiddleware())
 //            .grouped(AuthGuard())
         
