@@ -10,7 +10,7 @@
         "password":"mrqi",
         "database":"mrqi",
         "url": "postgres://mrqi:mrqi@localhost:5432/mrqi",
-        "maxConnections": 10
+        "maxConnections": 1000
     },
     "auth": {
         "jwtSecret": "dev_secret_key"

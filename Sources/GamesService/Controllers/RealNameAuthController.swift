@@ -12,14 +12,7 @@ struct RealNameAuthController {
     
     func index(req: Request) async throws -> Page<RealNameAuthResponse> {
         // 使用可选获取方法：参数不存在时返回 nil，而非抛出错误
-        let page = try? req.query.get(Int.self, at: "page")
-        let perPage = try? req.query.get(Int.self, at: "perPage")
-           
-        // 确保 page 和 perPage 不为 nil（兜底默认值）
-        let safePage = page ?? 1
-        let safePerPage = perPage ?? 10
-        
-        let pageRequest = PageRequest(page: safePage, per: safePerPage)
+        let pageRequest = try req.query.decode(PageRequest.self)
         
         return try await RealNameAuth.query(on: req.db)
             .filter(\.$deletedAt == nil)
@@ -30,17 +23,17 @@ struct RealNameAuthController {
     }
     
     func show(req: Request) async throws -> RealNameAuthResponse {
-        guard let userId = UUID(uuidString: req.parameters.get("userId")!) else {
-                throw Abort(.badRequest, reason: "无效的用户ID")
-            }
+        guard let userId = req.parameters.get("userId", as: UUID.self) else {
+            throw Abort(.badRequest, reason: "无效的用户ID")
+        }
             
-            guard let auth = try await RealNameAuth.query(on: req.db)
-                .filter(\.$userId == userId)
-                .first() else {
-                throw Abort(.notFound, reason: "未找到认证记录")
-            }
+        guard let auth = try await RealNameAuth.query(on: req.db)
+            .filter(\RealNameAuth.$user.$id == userId)
+            .first() else {
+            throw Abort(.notFound, reason: "未找到认证记录")
+        }
             
-            return RealNameAuthResponse(from: auth)
+        return RealNameAuthResponse(from: auth)
     }
     
     func create(req: Request) async throws -> RealNameAuthResponse {
@@ -53,7 +46,7 @@ struct RealNameAuthController {
             
         // 检查用户是否已认证
         let existingAuth = try await RealNameAuth.query(on: req.db)
-            .filter(\.$userId == dto.userId)
+            .filter(\RealNameAuth.$user.$id == dto.userId)
             .first()
             
         if existingAuth != nil {
@@ -70,49 +63,44 @@ struct RealNameAuthController {
     
     func update(req: Request) async throws -> RealNameAuthResponse {
         guard let id = req.parameters.get("id", as: UUID.self) else {
-                throw Abort(.badRequest, reason: "无效的认证ID")
-            }
+            throw Abort(.badRequest, reason: "无效的认证ID")
+        }
             
-            guard let auth = try await RealNameAuth.find(id, on: req.db) else {
-                throw Abort(.notFound, reason: "未找到认证记录")
-            }
+        guard let auth = try await RealNameAuth.find(id, on: req.db) else {
+            throw Abort(.notFound, reason: "未找到认证记录")
+        }
             
-            let verifyData = try req.content.decode(VerifyRealNameAuthRequest.self)
+        let verifyData = try req.content.decode(VerifyRealNameAuthRequest.self)
             
-            // 验证状态
-            guard verifyData.isValidStatus() else {
-                throw Abort(.badRequest, reason: "无效的审核状态")
-            }
+        // 验证状态
+        guard verifyData.isValidStatus() else {
+            throw Abort(.badRequest, reason: "无效的审核状态")
+        }
             
-            // 更新状态
-            auth.status = verifyData.status
-            auth.rejectReason = verifyData.reason
-            auth.verifiedAt = Date()
+        // 更新状态
+        auth.status = verifyData.status
+        auth.rejectReason = verifyData.reason
+        auth.verifiedAt = Date()
             
-            try await auth.save(on: req.db)
+        try await auth.save(on: req.db)
             
-            return RealNameAuthResponse(from: auth)
+        return RealNameAuthResponse(from: auth)
     }
     
     // 软删除角色
     func delete(req: Request) async throws -> HTTPStatus {
-        // 1. 转换 ID 类型
-        guard let idString = req.parameters.get("id"),
-              let id = UUID(uuidString: idString)
-        else {
+        guard let id = req.parameters.get("id", as: UUID.self) else {
             throw Abort(.badRequest, reason: "无效的认证ID")
         }
-        
-        // 2. 用 UUID 过滤角色
-        guard let auth = try await RealNameAuth.query(on: req.db)
-            .filter(\.$id == id)  // 类型匹配
-            .first()
-        else {
-            throw Abort(.badRequest, reason: "未找到认证记录")
+            
+        guard let auth = try await RealNameAuth.find(id, on: req.db) else {
+            throw Abort(.notFound, reason: "未找到认证记录")
         }
-        
-        // 3. 执行软删除
-        try await auth.delete(on: req.db)  // 自动设置 deletedAt 时间戳
+            
+        // ✅ 软删除：设置删除时间戳
+        auth.deletedAt = Date()
+        try await auth.save(on: req.db)
+            
         return .ok
     }
     
@@ -126,7 +114,6 @@ struct RealNameAuthController {
         guard let auth = try await RealNameAuth.query(on: req.db)
             .filter(\.$deletedAt != nil)
             .filter(\RealNameAuth.$id == id)
-            .filter(\RealNameAuth.$deletedAt != nil)
             .first() else {
             throw Abort(.notFound, reason: "未找到已删除的认证记录")
         }

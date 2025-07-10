@@ -71,7 +71,7 @@ struct UpdateUserRequest: Content {
 
 // 登录请求DTO
 struct LoginRequest: Content {
-    let email: String
+    let username: String
     let password: String
 }
 

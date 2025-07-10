@@ -11,7 +11,11 @@ struct APIRoutes {
     let app: Application
     
     func registerRoutes(prefix: String) throws {
-        let api = app.routes.grouped(PathComponent(stringLiteral: prefix))
+        let api = app.routes
+            .grouped(PathComponent(stringLiteral: prefix))
+//            .grouped(ErrorHandlingMiddleware())
+//            .grouped(JWTUserAuthenticationMiddleware())
+//            .grouped(AuthGuard())
         
         // 注册各个模块的路由
         RoleRoutes().register(on: api.grouped("app"))

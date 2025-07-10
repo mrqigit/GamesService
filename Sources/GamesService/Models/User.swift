@@ -43,8 +43,9 @@ final class User: Model, Content, ModelAuthenticatable, @unchecked Sendable {
     @OptionalChild(for: \.$user)
     var realNameAuth: RealNameAuth?
     
-    static let usernameKey = \User.$username
-    static let passwordHashKey = \User.$passwordHash
+    static let usernameKey: KeyPath<User, Field<String>> = \User.$username
+    
+    static let passwordHashKey: KeyPath<User, Field<String>> = \User.$passwordHash
         
     func verify(password: String) throws -> Bool {
         // ✅ 使用 Bcrypt 验证密码

@@ -13,27 +13,21 @@ struct UserController {
     // 获取用户列表
     func index(req: Request) async throws -> Page<UserResponse> {
         // 使用可选获取方法：参数不存在时返回 nil，而非抛出错误
-        let page = try? req.query.get(Int.self, at: "page")
-        let perPage = try? req.query.get(Int.self, at: "perPage")
-           
-        // 确保 page 和 perPage 不为 nil（兜底默认值）
-        let safePage = page ?? 1
-        let safePerPage = perPage ?? 10
-        
-        let pageRequest = PageRequest(page: safePage, per: safePerPage)
+        let pageRequest = try req.query.decode(PageRequest.self)
         
         // 执行查询并预加载关联数据
         let userPage = try await User.query(on: req.db)
-            .with(\.$role)           // 预加载角色
-            .with(\.$realNameAuth)   // 预加载实名认证
-            .filter(\.$deletedAt == nil)  // 过滤未删除的用户
-            .sort(\.$createdAt, .descending)  // 按创建时间排序
+            .with(\.$role)
+            .with(\.$realNameAuth)
+            .filter(\.$deletedAt == nil)
+            .sort(\.$createdAt, .descending)
             .paginate(pageRequest)
         
         // 转换为响应DTO
-        return try await userPage.map { user in
-            // 使用 requireParent 获取预加载的角色
-            let role = try user.requireParent(\User.$role)
+        return try userPage.map { user in
+            guard let role = user.$role.value else {
+                throw Abort(.internalServerError, reason: "角色关联丢失")
+            }
             
             return UserResponse(
                 from: user,
@@ -105,18 +99,33 @@ struct UserController {
         }
         
         // 查询用户及其关联数据
-        guard let user = try await User.query(on: req.db)
+        let user = try await User.query(on: req.db)
             .with(\.$role)
             .with(\.$realNameAuth)
             .filter(\.$id == id)
-            .first() else {
+            .first()
+        if user == nil {
             throw Abort(.notFound, reason: "用户不存在")
         }
         
-        return try await UserResponse(
-            from: user,
-            role: user.$role.get(),
-            auth: user.realNameAuth
+        // 在同一事务中查询最新数据
+        guard let updatedUser = try await User.query(on: req.db)
+            .with(\.$role)
+            .filter(\.$id == id)
+            .first() else {
+            throw Abort(.internalServerError, reason: "更新后无法获取用户数据")
+        }
+        
+        // ✅ 安全处理可选的角色值
+        guard let role = updatedUser.$role.value else {
+            throw Abort(.internalServerError, reason: "用户角色关联丢失")
+        }
+            
+        return UserResponse(
+            from: updatedUser,
+            role: RoleResponse(from:role),
+            auth: updatedUser.realNameAuth
+                .map { RealNameAuthResponse(from: $0) }
         )
     }
     
@@ -158,30 +167,28 @@ struct UserController {
             user.avatarUrl = avatarUrl
         }
         
-        return try await req.db.transaction { db in
-            // 在事务中执行更新
-            try await user.save(on: db)
-                
-            // 在同一事务中查询最新数据
-            guard let updatedUser = try await User.query(on: db)
-                .with(\.$role)
-                .filter(\.$id == id)
-                .first() else {
-                throw Abort(.internalServerError, reason: "更新后无法获取用户数据")
-            }
+        // 在事务中执行更新
+        try await user.save(on: req.db)
             
-            // ✅ 安全处理可选的角色值
-            guard let role = updatedUser.$role.value else {
-                throw Abort(.internalServerError, reason: "用户角色关联丢失")
-            }
-                
-            return UserResponse(
-                from: updatedUser,
-                role: RoleResponse(from:role),
-                auth: updatedUser.realNameAuth
-                    .map { RealNameAuthResponse(from: $0) }
-            )
+        // 在同一事务中查询最新数据
+        guard let updatedUser = try await User.query(on: req.db)
+            .with(\.$role)
+            .filter(\.$id == id)
+            .first() else {
+            throw Abort(.internalServerError, reason: "更新后无法获取用户数据")
         }
+        
+        // ✅ 安全处理可选的角色值
+        guard let role = updatedUser.$role.value else {
+            throw Abort(.internalServerError, reason: "用户角色关联丢失")
+        }
+            
+        return UserResponse(
+            from: updatedUser,
+            role: RoleResponse(from:role),
+            auth: updatedUser.realNameAuth
+                .map { RealNameAuthResponse(from: $0) }
+        )
     }
     
     // 软删除用户
@@ -246,25 +253,19 @@ struct UserController {
     }
     
     func login(req: Request) async throws -> LoginResponse {
-        let request = try req.content.decode(LoginRequest.self)
-        
-        // 使用 queryWithDeleted 确保可以查询到已删除用户
+        let credentials = try req.content.decode(LoginRequest.self)
+            
         guard let user = try await User.query(on: req.db)
-            .with(\.$role) // 预加载角色关联
-            .filter(\.$email == request.email)
+            .filter(\.$username == credentials.username)
             .first(),
-              try user.verify(password: request.password) else {
-            throw Abort(.unauthorized, reason: "邮箱或密码错误")
+              try Bcrypt
+            .verify(credentials.password, created: user.passwordHash) else {
+            throw Abort(.unauthorized)
         }
-        
-        // 检查用户是否已被软删除
-        guard user.deletedAt == nil else {
-            throw Abort(.forbidden, reason: "用户已被禁用，请联系管理员")
-        }
-        
-        // 创建认证令牌
-        let token = try user.generateToken()
-        try await token.save(on: req.db)
+            
+        // 显式指定签名算法
+        let payload = try UserPayload(user: user)
+        let token = try req.jwt.sign(payload)
         
         // ✅ 安全解包角色值
         guard let role = user.$role.value else {
@@ -272,7 +273,7 @@ struct UserController {
         }
             
         return LoginResponse(
-            token: token.value,
+            token: token,
             user: UserResponse(
                 from: user,
                 role: RoleResponse(from: role),  // 使用解包后的角色

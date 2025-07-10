@@ -13,14 +13,7 @@ struct RoleController {
     // 获取所有角色（分页+过滤软删除）
     func index(req: Request) async throws -> Page<RoleResponse> {
         // 使用可选获取方法：参数不存在时返回 nil，而非抛出错误
-        let page = try? req.query.get(Int.self, at: "page")
-        let perPage = try? req.query.get(Int.self, at: "perPage")
-           
-        // 确保 page 和 perPage 不为 nil（兜底默认值）
-        let safePage = page ?? 1
-        let safePerPage = perPage ?? 10
-        
-        let pageRequest = PageRequest(page: safePage, per: safePerPage)
+        let pageRequest = try req.query.decode(PageRequest.self)
         
         return try await Role.query(on: req.db)
             .filter(\Role.$deletedAt == nil)

@@ -14,10 +14,9 @@ let package = Package(
         // Vapor ORM (queries, models, and relations) for NoSQL and SQL databases
         .package(url: "https://github.com/vapor/fluent.git", from: "4.12.0"),
         // 🔑 JSON Web Token (JWT) signing and verification (HMAC, ECDSA, EdDSA, RSA, PSS) with support for JWS and JWK
-        .package(url: "https://github.com/vapor/jwt.git", from: "5.1.2"),
+        .package(url: "https://github.com/vapor/jwt.git", from: "4.0.0"),
         // 🐘 PostgreSQL driver for Fluent.
         .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.10.1"),
-        .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
     ],
     targets: [
         .executableTarget(
@@ -29,7 +28,6 @@ let package = Package(
                 .product(name: "Fluent", package: "fluent"),
                 .product(name: "FluentPostgresDriver", package: "fluent-postgres-driver"),
                 .product(name: "JWT", package: "jwt"),
-                .product(name: "JWTKit", package: "jwt-kit"),
             ],
             swiftSettings: swiftSettings
         ),
