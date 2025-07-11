@@ -10,7 +10,12 @@ import JWT
 
 struct JWTUserAuthenticationMiddleware: AsyncMiddleware {
     func respond(to request: Request, chainingTo next: any AsyncResponder) async throws -> Response {
-        guard let tokenString = request.headers.bearerAuthorization?.token else {
+        
+        if request.url.path == "/api/app/users/login" {
+            return try await next.respond(to: request)
+        }
+        
+        guard let tokenString = request.headers.first(name: "token") else {
             throw Abort(.unauthorized)
         }
         

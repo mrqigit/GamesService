@@ -14,12 +14,14 @@ struct APIRoutes {
         let api = app.routes
             .grouped(PathComponent(stringLiteral: prefix))
             .grouped(ErrorHandlingMiddleware())
-//            .grouped(JWTUserAuthenticationMiddleware())
-//            .grouped(AuthGuard())
+            .grouped(JWTUserAuthenticationMiddleware())
         
         // 注册各个模块的路由
         RoleRoutes().register(on: api.grouped("app"))
         RealNameAuthRoutes().register(on: api.grouped("app"))
         UserRoutes().register(on: api.grouped("app"))
+        AdvertisementRoutes().register(on: api.grouped("app"))
+        SignInRoutes().register(on: api.grouped("app"))
+        SignInConfigRoutes().register(on: api.grouped("app"))
     }
 }

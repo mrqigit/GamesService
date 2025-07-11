@@ -9,6 +9,10 @@ import Vapor
 
 public func configureMigrations(_ app: Application) {
     app.migrations.add(CreateRoles())
-    app.migrations.add(CreateRealNameAuth())
     app.migrations.add(CreateUser())
+    app.migrations.add(CreateRealNameAuth())
+    app.migrations.add(CreateAdvertisements())
+    app.migrations.add(CreateSignInRecord())
+    app.migrations.add(CreateSignInConfig())
+    app.migrations.add(CreateSignInRewardLog())
 }
