@@ -52,51 +52,29 @@ struct UserController {
         // 哈希密码
         let passwordHash = try Bcrypt.hash(dto.password)
         
-        // 处理角色ID（核心修正点）
-        let roleId: UUID
-        if let dtoRoleId = dto.roleId {
-            // 如果DTO提供了roleId，验证其有效性
-            guard try await Role.find(dtoRoleId, on: req.db) != nil else {
-                throw Abort(.badRequest, reason: "无效的角色ID")
-            }
-            roleId = dtoRoleId
-        } else {
-            // 如果未提供，使用默认角色（例如"user"角色）
-            guard let defaultRole = try await Role.query(on: req.db)
-                .filter(\Role.$type == "user")
-                .first() else {
-                throw Abort(.internalServerError, reason: "默认角色不存在，请先创建角色")
-            }
-            roleId = defaultRole.id! // 假设默认角色一定有ID（已保存到数据库）
-        }
-        
         // 创建用户
         let user = User(
             username: dto.username,
             email: dto.email,
             passwordHash: passwordHash,
-            roleId: roleId // 使用确定的roleId
         )
         
         try await user.save(on: req.db)
         
-        // 获取用户关联的角色（用于响应DTO）
-        guard let role = try await Role.find(roleId, on: req.db) else {
-            throw Abort(.internalServerError, reason: "角色信息获取失败")
+        guard let defaultRole = try await Role.query(on: req.db).filter(\.$type == "user").first() else {
+            throw Abort(.internalServerError, reason: "未找到角色")
         }
         
         return UserResponse(
             from: user,
-            role: RoleResponse(from: role),
+            role: RoleResponse(from: defaultRole),
             auth: nil
         )
     }
     
     // 获取单个用户
     func show(req: Request) async throws -> UserResponse {
-        guard let id = req.parameters.get("id", as: UUID.self) else {
-            throw Abort(.badRequest, reason: "无效的用户ID")
-        }
+        let id: UUID = try req.query.get(UUID.self, at: "id")
         
         // 查询用户及其关联数据
         let user = try await User.query(on: req.db)
@@ -111,6 +89,7 @@ struct UserController {
         // 在同一事务中查询最新数据
         guard let updatedUser = try await User.query(on: req.db)
             .with(\.$role)
+            .with(\.$realNameAuth)
             .filter(\.$id == id)
             .first() else {
             throw Abort(.internalServerError, reason: "更新后无法获取用户数据")
@@ -131,15 +110,12 @@ struct UserController {
     
     // 更新用户
     func update(req: Request) async throws -> UserResponse {
-        guard let id = req.parameters.get("id", as: UUID.self) else {
-            throw Abort(.badRequest, reason: "无效的用户ID")
-        }
-        
-        guard let user = try await User.find(id, on: req.db) else {
-            throw Abort(.notFound, reason: "用户不存在")
-        }
         
         let dto = try req.content.decode(UpdateUserRequest.self)
+        
+        guard let user = try await User.find(dto.id, on: req.db) else {
+            throw Abort(.notFound, reason: "用户不存在")
+        }
         
         if let username = dto.username {
             user.username = username
@@ -173,7 +149,8 @@ struct UserController {
         // 在同一事务中查询最新数据
         guard let updatedUser = try await User.query(on: req.db)
             .with(\.$role)
-            .filter(\.$id == id)
+            .with(\.$realNameAuth)
+            .filter(\.$id == dto.id)
             .first() else {
             throw Abort(.internalServerError, reason: "更新后无法获取用户数据")
         }
@@ -193,28 +170,26 @@ struct UserController {
     
     // 软删除用户
     func delete(req: Request) async throws -> HTTPStatus {
-        guard let id = req.parameters.get("id", as: UUID.self) else {
-            throw Abort(.badRequest, reason: "无效的用户ID")
-        }
+        let dto = try req.content.decode(UpdateUserRequest.self)
         
-        guard let user = try await User.find(id, on: req.db) else {
+        guard let user = try await User.find(dto.id, on: req.db) else {
             throw Abort(.notFound, reason: "用户不存在")
         }
         
-        try await user.delete(on: req.db) // 软删除
+        user.deletedAt = Date()
+        
+        try await user.update(on: req.db) // 软删除
         return .ok
     }
     
     // 恢复已删除用户
     func restore(req: Request) async throws -> UserResponse {
-        guard let id = req.parameters.get("id", as: UUID.self) else {
-            throw Abort(.badRequest, reason: "无效的用户ID")
-        }
+        let dto = try req.content.decode(UpdateUserRequest.self)
         
         // 查找已删除的用户
         guard let user = try await User.query(on: req.db)
             .with(\.$role)
-            .filter(\.$id == id)
+            .filter(\.$id == dto.id)
             .filter(\.$deletedAt != nil)
             .first() else {
             throw Abort(.notFound, reason: "未找到已删除的用户")
@@ -234,7 +209,7 @@ struct UserController {
         // 返回恢复后的用户
         guard let restoredUser = try await User.query(on: req.db)
             .with(\.$role)
-            .filter(\.$id == id)
+            .filter(\.$id == dto.id)
             .first() else {
             throw Abort(.internalServerError, reason: "恢复后无法获取用户数据")
         }
@@ -254,34 +229,32 @@ struct UserController {
     
     func login(req: Request) async throws -> LoginResponse {
         let credentials = try req.content.decode(LoginRequest.self)
-        try credentials.validate(on: req)
+        try credentials.validate()
         
         // 查询用户并预加载角色
         guard let user = try await User.query(on: req.db)
-            .with(\.$role) // 关键：预加载角色关系
+            .with(\.$role)
+            .with(\.$realNameAuth)
             .filter(\.$username == credentials.username)
             .first() else {
-            throw Abort(.unauthorized, reason: "用户名或密码错误")
+            throw Abort(.unauthorized, reason: "用户名不存在")
         }
         
         // 验证密码
         guard try Bcrypt.verify(credentials.password, created: user.passwordHash) else {
-            throw Abort(.unauthorized, reason: "用户名或密码错误")
+            throw Abort(.unauthorized, reason: "密码错误")
         }
         
         // 创建 JWT
         let payload = try UserPayload(user: user)
         let token = try req.jwt.sign(payload)
         
-        // 此时角色已预加载，可安全访问
-        let role = user.$role.value!
-        
         return LoginResponse(
             token: token,
             user: UserResponse(
                 from: user,
-                role: RoleResponse(from: role),
-                auth: user.realNameAuth.map { RealNameAuthResponse(from: $0) }
+                role: RoleResponse(from: user.role),
+                auth: RealNameAuthResponse(from: user.realNameAuth!)
             )
         )
     }

@@ -15,12 +15,8 @@ struct RoleRoutes {
         
         roles.get(use: controller.index)
         roles.post(use: controller.create)
-        
-        roles.group(":id") { role in
-            role.get(use: controller.show)
-            role.put(use: controller.update)
-            role.delete(use: controller.delete)
-            role.patch(use: controller.update)
-        }
+        roles.get("detail",use: controller.show)
+        roles.post("update",use: controller.update)
+        roles.post("delete",use: controller.delete)
     }
 }

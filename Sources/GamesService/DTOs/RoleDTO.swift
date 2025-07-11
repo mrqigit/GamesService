@@ -26,6 +26,7 @@ struct CreateRoleRequest: Content, Validatable {
 
 /// 2. 更新角色请求 DTO（使用可选字段，允许部分更新）
 struct UpdateRoleRequest: Content, Validatable {
+    let id: UUID
     let type: String?
     let typeZh: String?
     let typeEn: String?

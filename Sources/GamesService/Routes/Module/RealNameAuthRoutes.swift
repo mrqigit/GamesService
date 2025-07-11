@@ -15,12 +15,8 @@ struct RealNameAuthRoutes {
         
         realNames.get(use: controller.index)
         realNames.post(use: controller.create)
-        
-        realNames.group(":id") { realName in
-            realName.get(use: controller.show)
-            realName.put(use: controller.update)
-            realName.delete(use: controller.delete)
-            realName.patch(use: controller.update)
-        }
+        realNames.get("detail",use: controller.show)
+        realNames.post("update",use: controller.update)
+        realNames.post("delete",use: controller.delete)
     }
 }

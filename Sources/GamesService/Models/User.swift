@@ -59,14 +59,12 @@ final class User: Model, Content, ModelAuthenticatable, @unchecked Sendable {
         username: String,
         email: String,
         passwordHash: String,
-        roleId: UUID,
         avatarUrl: String? = nil
     ) {
         self.id = id
         self.username = username
         self.email = email
         self.passwordHash = passwordHash
-        self.$role.id = roleId
         self.avatarUrl = avatarUrl
     }
 }

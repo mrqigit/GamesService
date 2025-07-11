@@ -20,23 +20,23 @@ struct CreateRealNameAuthRequest: Content {
 // 实名认证响应DTO（隐藏敏感字段）
 struct RealNameAuthResponse: Content {
     let id: UUID?
-    let userId: UUID
-    let realName: String
-    let status: Int
+    let userId: UUID?
+    let realName: String?
+    let status: Int?
     let rejectReason: String?
     let createdAt: Date?
     let updatedAt: Date?
     let verifiedAt: Date?
     
-    init(from model: RealNameAuth) {
-        self.id = model.id
-        self.userId = model.$user.id
-        self.realName = model.realName
-        self.status = model.status
-        self.rejectReason = model.rejectReason
-        self.createdAt = model.createdAt
-        self.updatedAt = model.updatedAt
-        self.verifiedAt = model.verifiedAt
+    init(from model: RealNameAuth?) {
+        self.id = model?.id
+        self.userId = model?.$user.id
+        self.realName = model?.realName
+        self.status = model?.status
+        self.rejectReason = model?.rejectReason
+        self.createdAt = model?.createdAt
+        self.updatedAt = model?.updatedAt
+        self.verifiedAt = model?.verifiedAt
     }
 }
 

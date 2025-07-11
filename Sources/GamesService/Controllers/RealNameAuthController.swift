@@ -23,12 +23,10 @@ struct RealNameAuthController {
     }
     
     func show(req: Request) async throws -> RealNameAuthResponse {
-        guard let userId = req.parameters.get("userId", as: UUID.self) else {
-            throw Abort(.badRequest, reason: "无效的用户ID")
-        }
+        let id: UUID = try req.query.get(UUID.self, at: "id")
             
         guard let auth = try await RealNameAuth.query(on: req.db)
-            .filter(\RealNameAuth.$user.$id == userId)
+            .filter(\RealNameAuth.$user.$id == id)
             .first() else {
             throw Abort(.notFound, reason: "未找到认证记录")
         }
@@ -62,9 +60,7 @@ struct RealNameAuthController {
     }
     
     func update(req: Request) async throws -> RealNameAuthResponse {
-        guard let id = req.parameters.get("id", as: UUID.self) else {
-            throw Abort(.badRequest, reason: "无效的认证ID")
-        }
+        let id: UUID = try req.content.get(UUID.self, at: "id")
             
         guard let auth = try await RealNameAuth.find(id, on: req.db) else {
             throw Abort(.notFound, reason: "未找到认证记录")

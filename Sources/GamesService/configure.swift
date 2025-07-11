@@ -19,13 +19,13 @@ public func configure(_ app: Application) async throws {
     configureLogger(app)
     
     // 配置JWT
-//    configureJWT(app,config: config)
-//    
-//    // 表迁移
-//    configureMigrations(app)
-//    
-//    // 配置中间件
-//    configureMiddleware(app)
+    configureJWT(app,config: config)
+    
+    // 表迁移
+    configureMigrations(app)
+    
+    // 配置中间件
+    configureMiddleware(app)
     
     /// 注册路由
     app.http.server.configuration.port = 8890

@@ -26,11 +26,7 @@ struct RoleController {
     // 获取单个角色（过滤软删除）
     func show(req: Request) async throws -> RoleResponse {
         // 1. 获取并转换 ID 参数
-        guard let idString = req.parameters.get("id"),
-              let id = UUID(uuidString: idString)
-        else {
-            throw Abort(.badRequest, reason: ErrorMessage.invalidID)
-        }
+        let id: UUID = try req.query.get(UUID.self, at: "id")
             
         // 2. 用转换后的 UUID 过滤
         guard let role = try await Role.query(on: req.db)
@@ -78,15 +74,11 @@ struct RoleController {
     // 更新角色
     func update(req: Request) async throws -> RoleResponse {
         // 1. 将请求参数的 String ID 转换为 UUID
-        guard let idString = req.parameters.get("id"),
-              let id = UUID(uuidString: idString)
-        else {
-            throw Abort(.badRequest, reason: ErrorMessage.invalidID)
-        }
+        let dto = try req.content.decode(UpdateRoleRequest.self)
         
         // 2. 用 UUID 过滤角色（类型匹配）
         guard let role = try await Role.query(on: req.db)
-            .filter(\.$id == id)  // 左侧是 UUID 键路径，右侧是 UUID 类型
+            .filter(\.$id == dto.id)  // 左侧是 UUID 键路径，右侧是 UUID 类型
             .filter(\.$deletedAt == nil)
             .first()
         else {
