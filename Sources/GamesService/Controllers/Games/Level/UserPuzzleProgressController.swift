@@ -15,11 +15,11 @@ struct UserPuzzleProgressController {
     func create(req: Request) async throws -> UserPuzzleProgressDTO.Response {
         let data = try req.content.decode(UserPuzzleProgressDTO.Create.self)
         
-        guard let user = try await User.query(on: req.db).filter(\.$id == data.userID).first() else {
+        guard (try await User.query(on: req.db).filter(\.$id == data.userID).first()) != nil else {
             throw Abort(.notFound, reason: "用户不存在")
         }
         
-        guard let level = try await PuzzleLevel.query(on: req.db).filter(\.$id == data.levelID).first() else {
+        guard (try await PuzzleLevel.query(on: req.db).filter(\.$id == data.levelID).first()) != nil else {
             throw Abort(.notFound, reason: "关卡不存在")
         }
         

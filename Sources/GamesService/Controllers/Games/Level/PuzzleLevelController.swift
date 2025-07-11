@@ -139,8 +139,8 @@ struct PuzzleLevelController {
         }
         
         // 验证关卡是否存在
-        guard let level = try await PuzzleLevel.query(on: req.db)
-            .filter(\.$id == levelID).first() else {
+        guard (try await PuzzleLevel.query(on: req.db)
+            .filter(\.$id == levelID).first()) != nil else {
             throw Abort(.notFound, reason: "关卡不存在")
         }
         
@@ -186,8 +186,8 @@ struct PuzzleLevelController {
         }
         
         // 验证关卡是否存在
-        guard let level = try await PuzzleLevel.query(on: req.db)
-            .filter(\.$id == levelID).first() else {
+        guard (try await PuzzleLevel.query(on: req.db)
+            .filter(\.$id == levelID).first()) != nil else {
             throw Abort(.notFound, reason: "关卡不存在")
         }
         
