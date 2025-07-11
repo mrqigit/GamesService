@@ -23,5 +23,7 @@ struct APIRoutes {
         AdvertisementRoutes().register(on: api.grouped("app"))
         SignInRoutes().register(on: api.grouped("app"))
         SignInConfigRoutes().register(on: api.grouped("app"))
+        PuzzleLevelRoutes().register(on: api.grouped("app"))
+        UserPuzzleLevelRoutes().register(on: api.grouped("app"))
     }
 }

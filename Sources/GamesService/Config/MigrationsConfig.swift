@@ -15,4 +15,8 @@ public func configureMigrations(_ app: Application) {
     app.migrations.add(CreateSignInRecord())
     app.migrations.add(CreateSignInConfig())
     app.migrations.add(CreateSignInRewardLog())
+    app.migrations.add(CreatePuzzleLevels())
+    app.migrations.add(CreatePuzzleLevelConfigs())
+    app.migrations.add(CreateUserPuzzleProgress())
+    app.migrations.add(CreatePuzzleLevelRewards())
 }
